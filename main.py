@@ -33,20 +33,20 @@ df.drop_duplicates(subset='context', keep='first', inplace=True)
 # print(f'required vector dim: {vec}')
 
 # db dimension 768
-# pinecone_api_key = PINECONE_API_KEY
-# pc = Pinecone(api_key=PINECONE_API_KEY)
+pinecone_api_key = PINECONE_API_KEY
+pc = Pinecone(api_key=PINECONE_API_KEY)
 
-# pc.create_index(
-#     name="ai-agent",
-#     dimension=768,
-#     metric="dotproduct",
-#     spec=ServerlessSpec(    
-#         cloud="aws",
-#         region="us-east-1"
-#     )
-# )
+pc.create_index(
+    name="ai-agent",
+    dimension=768,
+    metric="dotproduct",
+    spec=ServerlessSpec(    
+        cloud="aws",
+        region="us-east-1"
+    )
+)
 
-# index = pc.Index('ai-agent')
+index = pc.Index('ai-agent')
 
 df_sample = df.sample(20, random_state=45)
 batch_size = 10
@@ -54,5 +54,15 @@ batch_size = 10
 for i in range(0, len(df_sample), batch_size):
     i_end = min(i+batch_size,len(df_sample))
     batch = df_sample.iloc[i:i_end].copy()
+    
     meta_data = [{'title': row['title'], 'context': row['context']} for i,row in batch.iterrows()]
+    
+    docs = batch['context'].tolist() # pd.series to python list
+    emb_vectors = [ get_embedding(text) for text in docs ]
+    ids = batch['id'].tolist()
+
+    # upsert
+    to_upsert = zip(ids, emb_vectors, meta_data)
+    index.upsert(vectors=to_upsert)
+
 
