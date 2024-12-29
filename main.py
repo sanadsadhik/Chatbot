@@ -4,15 +4,20 @@ from openai import OpenAI
 from sentence_transformers import SentenceTransformer
 from pinecone import Pinecone, ServerlessSpec
 from tqdm.auto import tqdm # to show progress bar
+from langchain_pinecone import PineconeVectorStore
+from langchain_openai import OpenAIEmbeddings
 
 from config import OPENAI_API_KEY, PINECONE_API_KEY
+from model import SentenceTransformerEmbeddings
 
 def get_embedding(text):
     text = text.replace('\n', ' ')
     return retriever.encode(text).tolist()
 
 # openai_api_key = OPENAI_API_KEY
-retriever = SentenceTransformer("flax-sentence-embeddings/all_datasets_v3_mpnet-base")
+# retriever = SentenceTransformer("flax-sentence-embeddings/all_datasets_v3_mpnet-base")
+model = SentenceTransformer("flax-sentence-embeddings/all_datasets_v3_mpnet-base")
+custom_embeddings = SentenceTransformerEmbeddings(model)
 
 data = load_dataset('squad', split='train')
 df = data.to_pandas()
@@ -36,33 +41,40 @@ df.drop_duplicates(subset='context', keep='first', inplace=True)
 pinecone_api_key = PINECONE_API_KEY
 pc = Pinecone(api_key=PINECONE_API_KEY)
 
-pc.create_index(
-    name="ai-agent",
-    dimension=768,
-    metric="dotproduct",
-    spec=ServerlessSpec(    
-        cloud="aws",
-        region="us-east-1"
-    )
-)
+# pc.create_index(
+#     name="ai-agent",
+#     dimension=768,
+#     metric="dotproduct",
+#     spec=ServerlessSpec(    
+#         cloud="aws",
+#         region="us-east-1"
+#     )
+# )
 
 index = pc.Index('ai-agent')
 
-df_sample = df.sample(20, random_state=45)
-batch_size = 10
+# df_sample = df.sample(20, random_state=45)
+# batch_size = 10
 
-for i in range(0, len(df_sample), batch_size):
-    i_end = min(i+batch_size,len(df_sample))
-    batch = df_sample.iloc[i:i_end].copy()
+# for i in range(0, len(df_sample), batch_size):
+#     i_end = min(i+batch_size,len(df_sample))
+#     batch = df_sample.iloc[i:i_end].copy()
     
-    meta_data = [{'title': row['title'], 'context': row['context']} for i,row in batch.iterrows()]
+#     meta_data = [{'title': row['title'], 'context': row['context']} for i,row in batch.iterrows()]
     
-    docs = batch['context'].tolist() # pd.series to python list
-    emb_vectors = [ get_embedding(text) for text in docs ]
-    ids = batch['id'].tolist()
+#     docs = batch['context'].tolist() # pd.series to python list
+#     emb_vectors = [ get_embedding(text) for text in docs ]
+#     ids = batch['id'].tolist()
 
-    # upsert
-    to_upsert = zip(ids, emb_vectors, meta_data)
-    index.upsert(vectors=to_upsert)
+#     # upsert
+#     to_upsert = zip(ids, emb_vectors, meta_data)
+#     index.upsert(vectors=to_upsert)
 
+vectorstore = PineconeVectorStore(index,custom_embeddings, "context", pinecone_api_key=PINECONE_API_KEY)
 
+query = "what is a physical database design?"
+
+res = vectorstore.similarity_search(query, k=3)
+print(res)
+# xc = index.query(vector=retriever.encode(query).tolist(), top_k=3, include_metadata=True)
+# print(xc)
