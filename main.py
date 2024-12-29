@@ -1,21 +1,13 @@
 from datasets import load_dataset
 import pandas
-from openai import OpenAI
 from sentence_transformers import SentenceTransformer
 from pinecone import Pinecone, ServerlessSpec
 from tqdm.auto import tqdm # to show progress bar
 from langchain_pinecone import PineconeVectorStore
-from langchain_openai import OpenAIEmbeddings
 
 from config import OPENAI_API_KEY, PINECONE_API_KEY
 from model import SentenceTransformerEmbeddings
 
-def get_embedding(text):
-    text = text.replace('\n', ' ')
-    return retriever.encode(text).tolist()
-
-# openai_api_key = OPENAI_API_KEY
-# retriever = SentenceTransformer("flax-sentence-embeddings/all_datasets_v3_mpnet-base")
 model = SentenceTransformer("flax-sentence-embeddings/all_datasets_v3_mpnet-base")
 custom_embeddings = SentenceTransformerEmbeddings(model)
 
@@ -26,23 +18,12 @@ df = data.to_pandas()
 # remove duplicates from the dataframe with same contexts
 df.drop_duplicates(subset='context', keep='first', inplace=True)
 
-# client = OpenAI(api_key=openai_api_key)
-# MODEL = "text-embedding-ada-002"
-# response = client.embeddings.create(
-#     input='i love openai',
-#     model=MODEL
-# )
-# print(response)
-
-# vec = get_embedding('I am trying a new text \n And see what happend')
-# print(f'required vector dim: {vec}')
-
 # db dimension 768
 pinecone_api_key = PINECONE_API_KEY
 pc = Pinecone(api_key=PINECONE_API_KEY)
 
 # pc.create_index(
-#     name="ai-agent",
+#     name="ai-agent1",
 #     dimension=768,
 #     metric="dotproduct",
 #     spec=ServerlessSpec(    
@@ -51,7 +32,7 @@ pc = Pinecone(api_key=PINECONE_API_KEY)
 #     )
 # )
 
-index = pc.Index('ai-agent')
+index = pc.Index('ai-agent1')
 
 # df_sample = df.sample(20, random_state=45)
 # batch_size = 10
@@ -63,7 +44,7 @@ index = pc.Index('ai-agent')
 #     meta_data = [{'title': row['title'], 'context': row['context']} for i,row in batch.iterrows()]
     
 #     docs = batch['context'].tolist() # pd.series to python list
-#     emb_vectors = [ get_embedding(text) for text in docs ]
+#     emb_vectors = custom_embeddings.embed_documents(docs)
 #     ids = batch['id'].tolist()
 
 #     # upsert
@@ -72,9 +53,7 @@ index = pc.Index('ai-agent')
 
 vectorstore = PineconeVectorStore(index,custom_embeddings, "context", pinecone_api_key=PINECONE_API_KEY)
 
-query = "what is a physical database design?"
+query = "what is physical data base design?"
 
 res = vectorstore.similarity_search(query, k=3)
 print(res)
-# xc = index.query(vector=retriever.encode(query).tolist(), top_k=3, include_metadata=True)
-# print(xc)
