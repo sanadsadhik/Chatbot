@@ -4,8 +4,11 @@ from sentence_transformers import SentenceTransformer
 from pinecone import Pinecone, ServerlessSpec
 from tqdm.auto import tqdm # to show progress bar
 from langchain_pinecone import PineconeVectorStore
+from langchain_community.llms import Cohere
+from langchain.chains.conversation.memory import ConversationBufferWindowMemory
+from langchain.chains import RetrievalQA
 
-from config import OPENAI_API_KEY, PINECONE_API_KEY
+from config import OPENAI_API_KEY, PINECONE_API_KEY, COHERE_API_KEY
 from model import SentenceTransformerEmbeddings
 
 model = SentenceTransformer("flax-sentence-embeddings/all_datasets_v3_mpnet-base")
@@ -19,7 +22,6 @@ df = data.to_pandas()
 df.drop_duplicates(subset='context', keep='first', inplace=True)
 
 # db dimension 768
-pinecone_api_key = PINECONE_API_KEY
 pc = Pinecone(api_key=PINECONE_API_KEY)
 
 # pc.create_index(
@@ -32,7 +34,7 @@ pc = Pinecone(api_key=PINECONE_API_KEY)
 #     )
 # )
 
-index = pc.Index('ai-agent1')
+index = pc.Index('ai-agent')
 
 # df_sample = df.sample(20, random_state=45)
 # batch_size = 10
@@ -52,8 +54,23 @@ index = pc.Index('ai-agent1')
 #     index.upsert(vectors=to_upsert)
 
 vectorstore = PineconeVectorStore(index,custom_embeddings, "context", pinecone_api_key=PINECONE_API_KEY)
+# query = "what is physical data base design?"
+# res = vectorstore.similarity_search(query, k=3)
+# print(res)
+
+llm = Cohere(cohere_api_key=COHERE_API_KEY)
+
+conv_mem = ConversationBufferWindowMemory(
+    memory_key='chat_history',
+    k=5,
+    return_messages=True
+)
+
+qa = RetrievalQA.from_chain_type(
+    llm = llm,
+    chain_type = 'stuff',
+    retriever = vectorstore.as_retriever()
+)
 
 query = "what is physical data base design?"
-
-res = vectorstore.similarity_search(query, k=3)
-print(res)
+print(qa.run(query))
